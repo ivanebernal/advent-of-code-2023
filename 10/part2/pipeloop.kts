@@ -18,6 +18,7 @@ val accessMap = mapOf(
 	'.' to listOf(0, 0, 0, 0),
 	'S' to listOf(1, 1, 1, 1),
 )
+val steps = listOf(Coord(-1, 0), Coord(0, 1), Coord(1, 0), Coord(0, -1))
 
 val pipeLoop = File(file).readLines()
 val visited = mutableSetOf<Coord>()
@@ -63,10 +64,6 @@ while(!queue.isEmpty()) {
 	}
 }
 
-var count = 0
-
-val steps = listOf(Coord(-1, 0), Coord(0, 1), Coord(1, 0), Coord(0, -1))
-
 val path = loopCoords.toMutableSet()
 val sortedPath = mutableListOf<Coord>(start)
 path.remove(start)
@@ -84,106 +81,23 @@ while (!path.isEmpty()) {
 	path.remove(next)
 	sortedPath.add(next)
 }
-sortedPath.removeFirst()
-// Look at one direction of the loop: inside or outside
-var direction = accessMap[pipeLoop[sortedPath[0]]]!!.indexOfFirst { it == 0 }
-val inside = mutableSetOf<Coord>()
-val tilesInDir = findTilesInDirection(direction)
-println(inside.size)
-println("---------")
-val tilesInOppositeDir = findTilesInDirection((direction + 2) % 4)
-printMap()
-println(inside.size)
 
-val result = Math.max(tilesInDir, tilesInOppositeDir)
+var count = 0
+var isInside = false
 
-fun findTilesInDirection(dir: Int): Int {
-	var currDir = dir
-	visited.clear()
-	var tileCount = 0
-	for (pipeIndex in 0 until sortedPath.size - 1) {
-		val pipeCoord = sortedPath[pipeIndex]
-		val nextPipeCoord = sortedPath[pipeIndex + 1]
-		val pipe = pipeLoop[pipeCoord]
-		val nextPipe = pipeLoop[nextPipeCoord]
-		if (pipe != '|' && pipe != '-') {
-			val biggestArea = findBiggestArea(pipeCoord + steps[currDir])
-			if (biggestArea == -1) {
-				// our current direction is outside, abort
-				println("OUTSIDE!!")
-				return -1 
-			} else {
-				// if(biggestArea > 0) println("Counted $biggestArea")
-				tileCount += biggestArea
-			}
-			val step = nextPipeCoord - pipeCoord
-			currDir = (currDir + directionChange(pipe, nextPipe, steps.indexOf(step)) + 4) % 4
-			// println("Direction change: $pipe -> $nextPipe ; $currDir")
-		}
-		val biggestArea = findBiggestArea(pipeCoord + steps[currDir])
-		if (biggestArea == -1) {
-			// our current direction is outside, abort
-			println("OUTSIDE!!")
-			return -1 
-		} else {
-			// if(biggestArea > 0) println("Counted $biggestArea")
-			tileCount += biggestArea
-		}
-		
-	}
-	return tileCount
-}
-
-fun findBiggestArea(coord: Coord): Int {
-	queue.clear()
-	if(!pipeLoop.inRange(coord)) return -1
-	var currentCount = 0
-	if (!visited.contains(coord) && !loopCoords.contains(coord)) {
-		var foundOutside = false
-		queue.add(coord)
-		while (!queue.isEmpty()) {
-			val tile = queue.poll()
-			if(!visited.contains(tile)) currentCount++
-			inside.add(tile)
-			visited.add(tile)
-			val nextCoords = steps.map { it + tile }
-			if (nextCoords.any { !pipeLoop.inRange(it) }) {
-				foundOutside = true
-			}
-			nextCoords.filter { nextTile ->
-				!visited.contains(nextTile) && 
-				// !queue.contains(nextTile) && 
-				pipeLoop.inRange(nextTile) && 
-				!loopCoords.contains(nextTile)
-			}.forEach{ queue.add(it) }
-		}
-
-		if (foundOutside) {
-			// This means it's not inside
-			return -1
+pipeLoop.forEachIndexed { rowIndex, row ->
+	isInside = false
+	row.forEachIndexed { colIndex, pipe ->
+		var p = if (pipe == 'S') findStart() else pipe
+		val pipeCoord = Coord(rowIndex, colIndex)
+		if (loopCoords.contains(pipeCoord) && accessMap[p]!![0] == 1) isInside = !isInside
+		else if (!loopCoords.contains(pipeCoord) && isInside) {
+			count++
 		}
 	}
-	queue.clear()
-	return currentCount
 }
-println("Inside: $result")
 
-fun printMap() {
-	pipeLoop.forEachIndexed { row, line ->
-		line.forEachIndexed { col, char ->
-			if (loopCoords.contains(Coord(row, col))) {
-				print(char)
-			} else {
-				if (inside.contains(Coord(row, col))) {
-					print("A")
-				} else {
-					print(".")
-				}
-			}
-		}
-	println()
-	}
-}
+println(count)
 
 fun findAccessibleSpaces(coord: Coord): List<Coord> {
 	// n, e, s, w -> s, w, n, e from the perspective of the space we are going to
@@ -222,10 +136,3 @@ fun List<String>.inRange(coord: Coord): Boolean =
 	!this[0].isEmpty() && coord.second < this[0].length
 
 fun Char.canGoTo(b: Char, direction: Int) = accessMap[this]!![direction] == 1 && accessMap[b]!![(direction + 2) % 4] == 1
-
-fun directionChange(curr: Char, next: Char, direction: Int): Int {
-	val prevDir = ((0 until 4).first { it != direction && accessMap[curr]!![it] == 1 } + 2) % 4
-	return if (direction - prevDir == 1 || direction - prevDir == -3) 1 else -1
-}
-
-// println(directionChange('L', '7', 1))
